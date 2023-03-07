@@ -4,7 +4,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import tracemalloc
-
+import time
 price_test = pd.read_csv(r'C:\Users\Chase\Downloads\pricing_test.csv')
 mms = StandardScaler()
 
@@ -82,7 +82,7 @@ model = tf.keras.Model(inputs = inputs, outputs = output)
 #x_array_t = np.array(x_t) 
 
 tracemalloc.start()
-
+start = time.time()
 ##Read in price data 1 row at a time
 for record in pd.read_csv(r'C:\Users\Chase\Downloads\pricing.csv', chunksize= 1):
     if record.isna().sum().sum() > 1:
@@ -112,7 +112,7 @@ for record in pd.read_csv(r'C:\Users\Chase\Downloads\pricing.csv', chunksize= 1)
     y_pred = model.predict(x)
     r2 = 1 - np.sum(np.square(y - y_pred)) / np.sum(np.square(y - np.mean(response)))
     r2_history.append(r2)
-    x_array = np.array(x)   #convert x (predictors) to array
+  #  x_array = np.array(x)   #convert x (predictors) to array
 
     model.compile(loss = 'mse', optimizer = tf.keras.optimizers.SGD(learning_rate = 0.01))
 
@@ -121,10 +121,12 @@ for record in pd.read_csv(r'C:\Users\Chase\Downloads\pricing.csv', chunksize= 1)
 
     model.fit(x=x ,y=y, batch_size=1, epochs=1)
     
-
+stop = time.time()
 snapshot = tracemalloc.take_snapshot()
 top_stats = snapshot.statistics('lineno')
 
+
+print(f"Training time: {stop - start}s")
 print("[ Top 10 ]")
 for stat in top_stats[:10]:
     print(stat)
@@ -155,6 +157,29 @@ np.max(r2_history)
 
 
 
+y_pred_test = model.predict(test_pred)
+
+batch_size = 32
+y_pred_test = np.concatenate([model.predict(test_pred[i:i+batch_size]) for i in range(0, len(test_pred), batch_size)])
+SS_res = 0
+SS_tot = 0
+for i in range(0, len(response), batch_size):
+    y_test_batch = response[i:i+batch_size]
+    y_pred_batch = y_pred[i:i+batch_size]
+    SS_res += np.sum((y_test_batch - y_pred_batch)**2)
+    SS_tot += np.sum((y_test_batch - np.mean(response))**2)
+R2 = 1 - SS_res/SS_tot
+print(f"R-squared: {R2}")
+
+
+
+
+SS_res = np.sum((response - y_pred_test)**2)
+
+
+r2_test = np.mean(1 - np.sum(np.square(response - y_pred_test)) / np.sum(np.square(response - np.mean(response))))
+
 #r2_test = R_squared(test_d[:,1], y_pred_test)
 
 model.summary()
+model.save('my_model_2.h5')
